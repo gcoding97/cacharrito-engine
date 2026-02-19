@@ -1,5 +1,6 @@
 package xyz.cacharrito.games.gameengine.core.middleware;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import xyz.cacharrito.games.gameengine.core.middleware.properties.WindowProperties;
@@ -7,16 +8,19 @@ import xyz.cacharrito.games.gameengine.core.middleware.properties.WindowProperti
 import static org.lwjgl.glfw.GLFW.GLFW_FALSE;
 import static org.lwjgl.glfw.GLFW.GLFW_PLATFORM;
 import static org.lwjgl.glfw.GLFW.GLFW_PLATFORM_X11;
+import static org.lwjgl.glfw.GLFW.GLFW_PRESS;
 import static org.lwjgl.glfw.GLFW.GLFW_RESIZABLE;
 import static org.lwjgl.glfw.GLFW.GLFW_TRUE;
 import static org.lwjgl.glfw.GLFW.GLFW_VISIBLE;
 import static org.lwjgl.glfw.GLFW.glfwCreateWindow;
 import static org.lwjgl.glfw.GLFW.glfwDefaultWindowHints;
 import static org.lwjgl.glfw.GLFW.glfwFocusWindow;
+import static org.lwjgl.glfw.GLFW.glfwGetKey;
 import static org.lwjgl.glfw.GLFW.glfwInit;
 import static org.lwjgl.glfw.GLFW.glfwInitHint;
 import static org.lwjgl.glfw.GLFW.glfwMakeContextCurrent;
 import static org.lwjgl.glfw.GLFW.glfwPollEvents;
+import static org.lwjgl.glfw.GLFW.glfwSetWindowSizeCallback;
 import static org.lwjgl.glfw.GLFW.glfwShowWindow;
 import static org.lwjgl.glfw.GLFW.glfwSwapBuffers;
 import static org.lwjgl.glfw.GLFW.glfwSwapInterval;
@@ -36,6 +40,7 @@ import static org.lwjgl.opengl.GL11.glLoadIdentity;
 import static org.lwjgl.opengl.GL11.glMatrixMode;
 import static org.lwjgl.opengl.GL11.glOrtho;
 import static org.lwjgl.opengl.GL11.glVertex2f;
+import static org.lwjgl.opengl.GL11.glViewport;
 
 @RequiredArgsConstructor
 public class Window {
@@ -43,6 +48,12 @@ public class Window {
     private final WindowProperties props;
 
     private long window;
+
+    @Getter
+    private int width;
+
+    @Getter
+    private int height;
 
     public void init() {
         GLFWErrorCallback.createPrint(System.err).set();
@@ -54,6 +65,8 @@ public class Window {
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE); // the window will stay hidden after creation
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE); // the window will be resizable
         window = glfwCreateWindow(props.width(), props.height(), props.title(), 0, 0);
+        width = props.width();
+        height = props.height();
         if (window == 0) {
             throw new IllegalStateException("Unable to create the window");
         }
@@ -68,6 +81,15 @@ public class Window {
         glfwSwapBuffers(window);
         glfwShowWindow(window);
         glfwFocusWindow(window);
+        glfwSetWindowSizeCallback(window, (_, width, height) -> {
+            this.width = width;
+            this.height = height;
+            glViewport(0, 0, width, height);
+            glMatrixMode(GL_PROJECTION);
+            glLoadIdentity();
+            glOrtho(0, width, height, 0, -1, 1);
+            glMatrixMode(GL_MODELVIEW);
+        });
     }
 
     public boolean shouldClose() {
@@ -95,4 +117,9 @@ public class Window {
         glVertex2f(x, y + height);          // Bottom Left
         glEnd();
     }
+
+    public boolean isKeyPressed(int key) {
+        return glfwGetKey(window, key) == GLFW_PRESS;
+    }
+
 }

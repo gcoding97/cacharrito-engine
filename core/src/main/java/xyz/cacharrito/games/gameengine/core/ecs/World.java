@@ -1,6 +1,7 @@
 package xyz.cacharrito.games.gameengine.core.ecs;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
@@ -38,6 +39,7 @@ public class World {
 
     @SuppressWarnings("unchecked")
     public <T extends Component> void addComponent(int entity, T component) {
+        var hasToChangeSignature = !entityManager.getEntitySignature(entity).get(getComponentId(component.getClass()));
         componentRegistry.compute(component.getClass(), (_, store) -> {
             ComponentStore<T> usedStore;
             if (store == null) {
@@ -47,10 +49,14 @@ public class World {
                 usedStore = (ComponentStore<T>) store;
                 usedStore.add(entity, component);
             }
-            entityManager.setEntitySignature(entity, getComponentId(component.getClass()));
+            if (hasToChangeSignature) {
+                entityManager.setEntitySignature(entity, getComponentId(component.getClass()));
+            }
             return usedStore;
         });
-        notifySystems(entity, entityManager.getEntitySignature(entity));
+        if (hasToChangeSignature) {
+            notifySystems(entity, entityManager.getEntitySignature(entity));
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -68,11 +74,18 @@ public class World {
     }
 
     public void update(float delta) {
-        logicSystemList.forEach(system -> system.update(delta));
+        logicSystemList.forEach(system -> system.innerUpdate(delta));
     }
 
     public void render(float delta) {
-        renderSystemList.forEach(system -> system.update(delta));
+        renderSystemList.forEach(system -> system.innerUpdate(delta));
+    }
+
+    @SafeVarargs
+    public final int[] getEntititesWithComponents(Class<? extends Component>... componentClasses) {
+        var wantedSignature = new BitSet();
+        Arrays.stream(componentClasses).forEach(componentClass -> wantedSignature.set(getComponentId(componentClass)));
+        return entityManager.getEntitiesWithSignature(wantedSignature);
     }
 
     int getComponentId(Class<? extends Component> componentClass) {

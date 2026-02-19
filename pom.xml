@@ -10,6 +10,7 @@
     <packaging>pom</packaging>
     <modules>
         <module>core</module>
+        <module>examples</module>
     </modules>
 
     <properties>
@@ -22,6 +23,11 @@
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>xyz.cacharrito.games</groupId>
+                <artifactId>core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.lwjgl</groupId>
                 <artifactId>lwjgl</artifactId>

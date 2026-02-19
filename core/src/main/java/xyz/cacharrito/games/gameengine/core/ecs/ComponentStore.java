@@ -21,6 +21,15 @@ public class ComponentStore<T extends Component> {
     }
 
     void add(int entityId, T component) {
+        var exisitingIndex = -1;
+        if (entityId < sparseEntities.length) {
+            exisitingIndex = sparseEntities[entityId];
+        }
+        if (exisitingIndex != -1 && exisitingIndex < currentSize && denseEntities[exisitingIndex] == entityId) {
+            components[exisitingIndex] = component;
+            return;
+        }
+
         if (entityId >= sparseEntities.length) {
             sparseEntities = resizeIntArray(sparseEntities, entityId + DEFAULT_SIZE);
         }

@@ -1,8 +1,10 @@
 package xyz.cacharrito.games.gameengine.core.ecs;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 
@@ -41,6 +43,19 @@ public class EntityManager {
 
     BitSet getEntitySignature(int entityId) {
         return entitySignatures.get(entityId);
+    }
+
+    int[] getEntitiesWithSignature(BitSet wantedSignature) {
+        List<Integer> entities = new ArrayList<>();
+        for (int i = activeEntities.nextSetBit(0); i >= 0; i = activeEntities.nextSetBit(i + 1)) {
+            var controlBitSet = new BitSet();
+            controlBitSet.or(wantedSignature);
+            controlBitSet.and(entitySignatures.get(i));
+            if (controlBitSet.equals(wantedSignature)) {
+                entities.add(i);
+            }
+        }
+        return entities.stream().mapToInt(Integer::intValue).toArray();
     }
 
     void destroyEntity(int entityId) {

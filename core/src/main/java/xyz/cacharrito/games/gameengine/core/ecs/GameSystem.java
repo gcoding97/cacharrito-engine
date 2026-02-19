@@ -50,6 +50,10 @@ public abstract class GameSystem {
         }
     }
 
-    public abstract void update(float delta);
+    void innerUpdate(float delta) {
+        forEachEntity(entity -> update(entity, delta));
+    }
+
+    public abstract void update(int entity, float delta);
 
 }
