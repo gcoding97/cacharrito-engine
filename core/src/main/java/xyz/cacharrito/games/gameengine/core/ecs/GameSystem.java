@@ -39,9 +39,13 @@ public abstract class GameSystem {
 
         if (interested && !isMember) {
             entities.set(entityId);
+            onEntitySignatureChangedCallback(entityId);
         } else if (!interested && isMember) {
             entities.clear(entityId);
         }
+    }
+
+    public void onEntitySignatureChangedCallback(int entityId) {
     }
 
     public void forEachEntity(IntConsumer action) {
