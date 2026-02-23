@@ -1,20 +1,26 @@
 package xyz.cacharrito.games.gameengine.examples.example_01;
 
+import xyz.cacharrito.games.gameengine.core.Engine;
+import xyz.cacharrito.games.gameengine.core.component.AffectedByDefaultKinematicSystem;
+import xyz.cacharrito.games.gameengine.core.component.Collider2D;
+import xyz.cacharrito.games.gameengine.core.component.InputSettings;
+import xyz.cacharrito.games.gameengine.core.component.Transform2D;
+import xyz.cacharrito.games.gameengine.core.component.Velocity2D;
+import xyz.cacharrito.games.gameengine.core.component.data.CollisionShape;
+import xyz.cacharrito.games.gameengine.core.component.data.RectangleCollisionShape;
+import xyz.cacharrito.games.gameengine.core.component.input.InputAction;
+import xyz.cacharrito.games.gameengine.core.component.input.InputEventListener;
+import xyz.cacharrito.games.gameengine.core.component.input.InputKey;
 import xyz.cacharrito.games.gameengine.core.ecs.Component;
 import xyz.cacharrito.games.gameengine.core.ecs.GameSystem;
 import xyz.cacharrito.games.gameengine.core.ecs.RenderSystem;
 import xyz.cacharrito.games.gameengine.core.ecs.RequireComponents;
 import xyz.cacharrito.games.gameengine.core.ecs.World;
+import xyz.cacharrito.games.gameengine.core.math.Vector2;
 import xyz.cacharrito.games.gameengine.core.middleware.Window;
 import xyz.cacharrito.games.gameengine.core.scene.Scene;
 
-import java.util.Arrays;
-import java.util.Objects;
-
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_A;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_D;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_S;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_W;
+import java.util.List;
 
 public class FirstGameScene implements Scene {
 
@@ -25,27 +31,31 @@ public class FirstGameScene implements Scene {
     public void init(World world, Window window) {
         this.world = world;
 
-        world.addSystem(new RenderRectangleSystem(world, window));
-        world.addSystem(new MovementSystem(world));
-        world.addSystem(new InputSystem(world, window, 150));
-        world.addSystem(new BoundarySystem(world, window));
-        world.addSystem(new CollisionSystem(world));
+        world.addSystem(new RenderRectangleSystem(world));
+        world.addSystem(new BoundarySystem(world));
 
         entities = new int[2];
         int player = world.createEntity();
         world.addComponent(player, new KeepOnScreen());
-        world.addComponent(player, new PlayerControlled());
-        world.addComponent(player, new Position(0, 0));
-        world.addComponent(player, new RectangleSprite(new Rectangle(250, 250), 0, 1, 0, 1));
-        world.addComponent(player, new Velocity(0, 0));
-        world.addComponent(player, new Collider(new Rectangle(250, 250), new Position(0, 0), false));
+        world.addComponent(player, new AffectedByDefaultKinematicSystem());
+        world.addComponent(player, Transform2D.DEFAULT);
+        world.addComponent(player, new RectangleSprite(new RectangleCollisionShape(250, 250), 0, 1, 0, 1));
+        world.addComponent(player, new Velocity2D(new Vector2(0, 0)));
+        world.addComponent(player, new Collider2D(new RectangleCollisionShape(250, 250), Vector2.ZERO, false, 1, 2));
+        world.addComponent(player, new InputSettings(List.of(
+                new InputAction("moveUp", List.of(InputKey.KEY_W, InputKey.KEY_UP, InputKey.GAMEPAD_DPAD_UP)),
+                new InputAction("moveDown", List.of(InputKey.KEY_S, InputKey.KEY_DOWN, InputKey.GAMEPAD_DPAD_DOWN)),
+                new InputAction("moveLeft", List.of(InputKey.KEY_A, InputKey.KEY_LEFT, InputKey.GAMEPAD_DPAD_LEFT)),
+                new InputAction("moveRight", List.of(InputKey.KEY_D, InputKey.KEY_RIGHT, InputKey.GAMEPAD_DPAD_RIGHT))),
+                new PlayerInputEventListener(world, player, 10000)));
         entities[0] = player;
         System.out.printf("Entity %s created%n", player);
 
         int obstacle = world.createEntity();
-        world.addComponent(obstacle, new Position(window.getWidth() / 2f - 25, window.getHeight() / 2f - 25));
-        world.addComponent(obstacle, new RectangleSprite(new Rectangle(50, 50), 1, 0, 1, 1));
-        world.addComponent(obstacle, new Collider(new Rectangle(50, 50), new Position(0, 0), false));
+        world.addComponent(obstacle, new Transform2D(new Vector2(window.getWidth() / 2f - 25, window.getHeight() / 2f - 25), 0, Vector2.ONE));
+        world.addComponent(obstacle, new RectangleSprite(new RectangleCollisionShape(50, 50), 1, 0, 1, 1));
+
+        world.addComponent(obstacle, new Collider2D(new RectangleCollisionShape(50, 50), Vector2.ZERO, false, 2, 0));
         entities[1] = obstacle;
         System.out.printf("Entity %s created%n", obstacle);
     }
@@ -66,201 +76,149 @@ public class FirstGameScene implements Scene {
         world.destroyEntity(entities[0]);
     }
 
-    public record Position(float x, float y) implements Component {
-    }
-
-    public record PlayerControlled() implements Component {
-    }
-
     public record KeepOnScreen() implements Component {
     }
 
-    public record Velocity(float x, float y) implements Component {
-    }
-
-    public record Rectangle(float width, float height) implements Component {
-    }
-
-    public record RectangleSprite(Rectangle rect, float r, float g, float b, float a) implements Component {
-    }
-
-    public record Collider(Rectangle rect, Position localPosition, boolean isTrigger) implements Component {
-    }
-
-    @RequireComponents({Position.class, Velocity.class})
-    public static class MovementSystem extends GameSystem {
-        public MovementSystem(World world) {
-            super(world);
-        }
-
-        @Override
-        public void update(int entity, float delta) {
-            var pos = getWorld().getComponent(entity, Position.class);
-            var velocity = getWorld().getComponent(entity, Velocity.class);
-            var newPos = new Position(pos.x() + velocity.x() * delta, pos.y() + velocity.y() * delta);
-            getWorld().addComponent(entity, newPos);
-        }
+    public record RectangleSprite(CollisionShape rect, float r, float g, float b, float a) implements Component {
     }
 
     @RenderSystem
-    @RequireComponents({Position.class, RectangleSprite.class})
+    @RequireComponents({Transform2D.class, RectangleSprite.class})
     public static class RenderRectangleSystem extends GameSystem {
         private final Window window;
 
-        public RenderRectangleSystem(World world, Window window) {
+        public RenderRectangleSystem(World world) {
             super(world);
-            this.window = window;
+            this.window = Engine.getMainWindow();
         }
 
         @Override
         public void update(int entity, float delta) {
-            var pos = getWorld().getComponent(entity, Position.class);
+            var transform2D = getWorld().getComponent(entity, Transform2D.class);
             var sprite = getWorld().getComponent(entity, RectangleSprite.class);
-            window.drawQuad(pos.x(), pos.y(), sprite.rect().width(), sprite.rect().height(), sprite.r(), sprite.g(), sprite.b(), sprite.a());
+            window.drawQuad(transform2D.position().x(), transform2D.position().y(), sprite.rect().getArea().x(), sprite.rect().getArea().y(), sprite.r(), sprite.g(), sprite.b(), sprite.a());
         }
     }
 
-    @RequireComponents({PlayerControlled.class, Velocity.class})
-    public static class InputSystem extends GameSystem {
-
-        private final Window window;
-        private final float speed;
-
-        public InputSystem(World world, Window window, float speed) {
-            super(world);
-            this.window = window;
-            this.speed = speed;
-        }
-
-        @Override
-        public void update(int entity, float delta) {
-            float x = 0;
-            float y = 0;
-
-            if (window.isKeyPressed(GLFW_KEY_W)) y -= speed;
-            if (window.isKeyPressed(GLFW_KEY_S)) y += speed;
-            if (window.isKeyPressed(GLFW_KEY_A)) x -= speed;
-            if (window.isKeyPressed(GLFW_KEY_D)) x += speed;
-
-            getWorld().addComponent(entity, new Velocity(x, y));
-        }
-    }
-
-    @RequireComponents({Collider.class, KeepOnScreen.class})
+    @RequireComponents({Transform2D.class, Collider2D.class, KeepOnScreen.class})
     public static class BoundarySystem extends GameSystem {
 
         private final Window window;
 
-        public BoundarySystem(World world, Window window) {
+        public BoundarySystem(World world) {
             super(world);
-            this.window = window;
+            this.window = Engine.getMainWindow();
         }
 
         @Override
         public void update(int entity, float delta) {
-            var position = getWorld().getComponent(entity, Position.class);
-            var collider = getWorld().getComponent(entity, Collider.class);
+            var transform2D = getWorld().getComponent(entity, Transform2D.class);
+            var collider = getWorld().getComponent(entity, Collider2D.class);
             var windowWidth = window.getWidth();
             var windowHeight = window.getHeight();
             var changed = false;
-            if (position.x() < 0) {
-                position = new Position(0, position.y());
+            if (transform2D.position().x() < 0) {
+                transform2D = new Transform2D(new Vector2(0, transform2D.position().y()), transform2D.rotation(), transform2D.scale());
                 changed = true;
-            } else if (position.x() + collider.rect().width() > windowWidth) {
-                position = new Position(windowWidth - collider.rect().width(), position.y());
+            } else if (transform2D.position().x() + collider.shape().getArea().x() > windowWidth) {
+                transform2D = new Transform2D(new Vector2(windowWidth - collider.shape().getArea().x(), transform2D.position().y()), transform2D.rotation(), transform2D.scale());
                 changed = true;
             }
 
-            if (position.y() < 0) {
-                position = new Position(position.x(), 0);
+            if (transform2D.position().y() < 0) {
+                transform2D = new Transform2D(new Vector2(transform2D.position().x(), 0), transform2D.rotation(), transform2D.scale());
                 changed = true;
-            } else if (position.y() + collider.rect().height() > windowHeight) {
-                position = new Position(position.x(), windowHeight - collider.rect().height());
+            } else if (transform2D.position().y() + collider.shape().getArea().y() > windowHeight) {
+                transform2D = new Transform2D(new Vector2(transform2D.position().x(), windowHeight - collider.shape().getArea().y()), transform2D.rotation(), transform2D.scale());
                 changed = true;
             }
 
             if (changed) {
-                getWorld().addComponent(entity, position);
+                getWorld().addComponent(entity, transform2D);
             }
         }
     }
 
-    @RequireComponents({Collider.class, PlayerControlled.class, Position.class})
-    public static class CollisionSystem extends GameSystem {
-        public CollisionSystem(World world) {
-            super(world);
-        }
+    @SuppressWarnings("unused") // Used by ReflectionAPI
+    public static class PlayerInputEventListener extends InputEventListener {
 
-        private boolean isColliding(Collider oneCol, Position onePos, Collider otherCol, Position otherPos) {
-            return onePos.x() < otherPos.x() + otherCol.rect().width() &&
-                    onePos.x() + oneCol.rect().width() > otherPos.x() &&
-                    onePos.y() < otherPos.y() + otherCol.rect().height() &&
-                    onePos.y() + oneCol.rect().height() > otherPos.y();
+        private boolean velocityChanged = false;
+
+        @Override
+        public void handleLeftJoystickEvent(Vector2 axis, float delta) {
+            var velocity = getWorld().getComponent(getEntity(), Velocity2D.class);
+            var newVelocity = new Velocity2D(axis.multiply(speed).multiply(delta));
+            getWorld().addComponent(getEntity(), newVelocity);
+            velocityChanged = !newVelocity.value().equals(velocity.value());
         }
 
         @Override
-        public void update(int entity, float delta) {
-            var collider = getWorld().getComponent(entity, Collider.class);
-            var position = getWorld().getComponent(entity, Position.class);
-            var colliding = new boolean[1];
-            Arrays.stream(getWorld().getEntititesWithComponents(Collider.class, Position.class))
-                    .forEach(other -> {
-                        if (entity == other) {
-                            return;
-                        }
-                        var otherCollider = getWorld().getComponent(other, Collider.class);
-                        var otherPosition = getWorld().getComponent(other, Position.class);
-                        colliding[0] = isColliding(collider, position, otherCollider, otherPosition);
-                        if (collider.isTrigger() || otherCollider.isTrigger()) {
-                            return;
-                        }
-                        var newEntityPosition = resolveCollision(collider, position, otherCollider, otherPosition);
-                        if (Objects.isNull(newEntityPosition)) {
-                            return;
-                        }
-                        getWorld().addComponent(entity, newEntityPosition);
-                    });
-            if (colliding[0] && collider.isTrigger()) {
-                getWorld().addComponent(entity, new RectangleSprite(collider.rect, 1, 0, 0, 1));
-            } else if (collider.isTrigger()) {
-                getWorld().addComponent(entity, new RectangleSprite(collider.rect, 0, 1, 0, 1));
+        public void handleRightJoystickEvent(Vector2 axis, float delta) {
+            if (velocityChanged) {
+                return;
+            }
+            var velocity = getWorld().getComponent(getEntity(), Velocity2D.class);
+            var newVelocity = new Velocity2D(axis.multiply(speed).multiply(delta));
+            getWorld().addComponent(getEntity(), newVelocity);
+            velocityChanged = !newVelocity.value().equals(velocity.value());
+        }
+
+        private final float speed;
+
+        public PlayerInputEventListener(World world, int entity, float speed) {
+            super(world, entity);
+            this.speed = speed;
+        }
+
+        public void moveUp(Boolean isPressed, Float delta) {
+            if (velocityChanged) {
+                return;
+            }
+            var velocity = getWorld().getComponent(getEntity(), Velocity2D.class);
+            if (isPressed && velocity.value().y() >= 0) {
+                getWorld().addComponent(getEntity(), new Velocity2D(new Vector2(velocity.value().x(), velocity.value().y() - speed * delta)));
+            } else if (!isPressed && velocity.value().y() < 0) {
+                getWorld().addComponent(getEntity(), new Velocity2D(new Vector2(velocity.value().x(), velocity.value().y() + speed * delta)));
             }
         }
 
-        private Position resolveCollision(Collider oneCol, Position onePos, Collider otherCol, Position otherPos) {
-            float oneCenterX = onePos.x() + (oneCol.rect().width() / 2f);
-            float oneCenterY = onePos.y() + (oneCol.rect().height() / 2f);
-            float otherCenterX = otherPos.x() + (otherCol.rect().width() / 2f);
-            float otherCenterY = otherPos.y() + (otherCol.rect().height() / 2f);
-
-            float centerDistanceX = oneCenterX - otherCenterX;
-            float centerDistanceY = oneCenterY - otherCenterY;
-
-            float minDistanceX = (oneCol.rect().width() / 2f) + (otherCol.rect().width() / 2f);
-            float minDistanceY = (oneCol.rect().height() / 2f) + (otherCol.rect().height() / 2f);
-
-            float overlapX = minDistanceX - Math.abs(centerDistanceX);
-            float overlapY = minDistanceY - Math.abs(centerDistanceY);
-
-            if (overlapX > 0 && overlapY > 0) {
-                float newX = onePos.x();
-                float newY = onePos.y();
-                if (overlapX < overlapY) {
-                    if (centerDistanceX > 0) {
-                        newX += overlapX;
-                    } else {
-                        newX -= overlapX;
-                    }
-                } else {
-                    if (centerDistanceY > 0) {
-                        newY += overlapY;
-                    } else {
-                        newY -= overlapY;
-                    }
-                }
-                return new Position(newX, newY);
+        public void moveDown(Boolean isPressed, Float delta) {
+            if (velocityChanged) {
+                return;
             }
-            return null;
+            var velocity = getWorld().getComponent(getEntity(), Velocity2D.class);
+            if (isPressed && velocity.value().y() <= 0) {
+                getWorld().addComponent(getEntity(), new Velocity2D(new Vector2(velocity.value().x(), velocity.value().y() + speed * delta)));
+            } else if (!isPressed && velocity.value().y() > 0) {
+                getWorld().addComponent(getEntity(), new Velocity2D(new Vector2(velocity.value().x(), velocity.value().y() - speed * delta)));
+            }
+        }
+
+        public void moveLeft(Boolean isPressed, Float delta) {
+            if (velocityChanged) {
+                return;
+            }
+            var velocity = getWorld().getComponent(getEntity(), Velocity2D.class);
+            if (isPressed && velocity.value().x() >= 0) {
+                getWorld().addComponent(getEntity(), new Velocity2D(new Vector2(velocity.value().x() - speed * delta, velocity.value().y())));
+            } else if (!isPressed && velocity.value().x() < 0) {
+                getWorld().addComponent(getEntity(), new Velocity2D(new Vector2(velocity.value().x() + speed * delta, velocity.value().y())));
+            }
+        }
+
+        public void moveRight(Boolean isPressed, Float delta) {
+            if (velocityChanged) {
+                velocityChanged = false;
+                return;
+            }
+            var velocity = getWorld().getComponent(getEntity(), Velocity2D.class);
+            if (isPressed && velocity.value().x() <= 0) {
+                getWorld().addComponent(getEntity(), new Velocity2D(new Vector2(velocity.value().x() + speed * delta, velocity.value().y())));
+            } else if (!isPressed && velocity.value().x() > 0) {
+                getWorld().addComponent(getEntity(), new Velocity2D(new Vector2(velocity.value().x() - speed * delta, velocity.value().y())));
+            }
+            velocityChanged = false;
         }
     }
+
 }

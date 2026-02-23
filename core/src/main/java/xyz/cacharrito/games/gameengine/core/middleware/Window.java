@@ -16,6 +16,7 @@ import static org.lwjgl.glfw.GLFW.glfwCreateWindow;
 import static org.lwjgl.glfw.GLFW.glfwDefaultWindowHints;
 import static org.lwjgl.glfw.GLFW.glfwFocusWindow;
 import static org.lwjgl.glfw.GLFW.glfwGetKey;
+import static org.lwjgl.glfw.GLFW.glfwGetMouseButton;
 import static org.lwjgl.glfw.GLFW.glfwInit;
 import static org.lwjgl.glfw.GLFW.glfwInitHint;
 import static org.lwjgl.glfw.GLFW.glfwMakeContextCurrent;
@@ -47,6 +48,7 @@ public class Window {
 
     private final WindowProperties props;
 
+    @Getter
     private long window;
 
     @Getter
@@ -120,6 +122,10 @@ public class Window {
 
     public boolean isKeyPressed(int key) {
         return glfwGetKey(window, key) == GLFW_PRESS;
+    }
+
+    public boolean isMouseButtonPressed(int button) {
+        return glfwGetMouseButton(window, button) == GLFW_PRESS;
     }
 
 }

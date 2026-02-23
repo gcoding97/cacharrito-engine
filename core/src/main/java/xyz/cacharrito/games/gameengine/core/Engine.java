@@ -1,9 +1,16 @@
 package xyz.cacharrito.games.gameengine.core;
 
+import lombok.Getter;
 import xyz.cacharrito.games.gameengine.core.ecs.World;
 import xyz.cacharrito.games.gameengine.core.middleware.Window;
 import xyz.cacharrito.games.gameengine.core.middleware.properties.WindowProperties;
 import xyz.cacharrito.games.gameengine.core.scene.Scene;
+import xyz.cacharrito.games.gameengine.core.system.CollisionSystem2D;
+import xyz.cacharrito.games.gameengine.core.system.InputSystem;
+import xyz.cacharrito.games.gameengine.core.system.KinematicSystem2D;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static java.lang.System.nanoTime;
 
@@ -14,13 +21,24 @@ public class Engine {
     private static final float DESIRED_DELTA_TIME = 1f / 60f;
     private static Scene currentScene;
 
+    @Getter
+    private static final List<Window> allWindows = new ArrayList<>();
+    @Getter
+    private static Window mainWindow;
+
     public static void startGame(Scene firstScene) {
         currentScene = firstScene;
 
         var window = new Window(new WindowProperties("Cacharrito Engine", VSYNC_BUFFER_INTERVAL, 800, 600));
         window.init();
+        mainWindow = window;
+        allWindows.add(window);
 
         var world = new World();
+        world.addSystem(new InputSystem(world));
+        world.addSystem(new KinematicSystem2D(world));
+        world.addSystem(new CollisionSystem2D(world));
+
         currentScene.init(world, window);
 
         var fixedDelta = 0f;
@@ -46,6 +64,5 @@ public class Engine {
         }
         currentScene.dispose();
     }
-
 
 }
