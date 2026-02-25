@@ -3,8 +3,12 @@ package xyz.cacharrito.games.gameengine.core.graphics;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.joml.Matrix4f;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import xyz.cacharrito.games.gameengine.core.graphics.properties.WindowProperties;
+
+import java.nio.FloatBuffer;
+import java.util.stream.IntStream;
 
 import static org.lwjgl.glfw.GLFW.GLFW_CONTEXT_VERSION_MAJOR;
 import static org.lwjgl.glfw.GLFW.GLFW_CONTEXT_VERSION_MINOR;
@@ -34,29 +38,35 @@ import static org.lwjgl.glfw.GLFW.glfwSwapInterval;
 import static org.lwjgl.glfw.GLFW.glfwWindowHint;
 import static org.lwjgl.glfw.GLFW.glfwWindowShouldClose;
 import static org.lwjgl.opengl.GL.createCapabilities;
-import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
-import static org.lwjgl.opengl.GL11.GL_FLOAT;
-import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
-import static org.lwjgl.opengl.GL11.GL_UNSIGNED_INT;
-import static org.lwjgl.opengl.GL11.glClear;
-import static org.lwjgl.opengl.GL11.glClearColor;
-import static org.lwjgl.opengl.GL11.glDrawElements;
-import static org.lwjgl.opengl.GL11.glViewport;
-import static org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER;
-import static org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER;
-import static org.lwjgl.opengl.GL15.GL_STATIC_DRAW;
-import static org.lwjgl.opengl.GL15.glBindBuffer;
-import static org.lwjgl.opengl.GL15.glBufferData;
-import static org.lwjgl.opengl.GL15.glDeleteBuffers;
-import static org.lwjgl.opengl.GL15.glGenBuffers;
-import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
-import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
-import static org.lwjgl.opengl.GL30.glBindVertexArray;
-import static org.lwjgl.opengl.GL30.glDeleteVertexArrays;
-import static org.lwjgl.opengl.GL30.glGenVertexArrays;
+import static org.lwjgl.opengl.GL15.glBufferSubData;
+import static org.lwjgl.opengl.GL31.glDrawElementsInstanced;
+import static org.lwjgl.opengl.GL46.GL_ARRAY_BUFFER;
+import static org.lwjgl.opengl.GL46.GL_COLOR_BUFFER_BIT;
+import static org.lwjgl.opengl.GL46.GL_DYNAMIC_DRAW;
+import static org.lwjgl.opengl.GL46.GL_ELEMENT_ARRAY_BUFFER;
+import static org.lwjgl.opengl.GL46.GL_FLOAT;
+import static org.lwjgl.opengl.GL46.GL_STATIC_DRAW;
+import static org.lwjgl.opengl.GL46.GL_TRIANGLES;
+import static org.lwjgl.opengl.GL46.GL_UNSIGNED_INT;
+import static org.lwjgl.opengl.GL46.glBindBuffer;
+import static org.lwjgl.opengl.GL46.glBindVertexArray;
+import static org.lwjgl.opengl.GL46.glBufferData;
+import static org.lwjgl.opengl.GL46.glClear;
+import static org.lwjgl.opengl.GL46.glClearColor;
+import static org.lwjgl.opengl.GL46.glDeleteBuffers;
+import static org.lwjgl.opengl.GL46.glDeleteVertexArrays;
+import static org.lwjgl.opengl.GL46.glEnableVertexAttribArray;
+import static org.lwjgl.opengl.GL46.glGenBuffers;
+import static org.lwjgl.opengl.GL46.glGenVertexArrays;
+import static org.lwjgl.opengl.GL46.glVertexAttribDivisor;
+import static org.lwjgl.opengl.GL46.glVertexAttribPointer;
+import static org.lwjgl.opengl.GL46.glViewport;
 
 @RequiredArgsConstructor
 public class Window {
+
+    private static final int MAX_INSTANCES = 10000;
+    private static final int INSTANCE_DATA_SIZE = 20; // 16 (mat4) + 4 (vec4)
 
     private final WindowProperties props;
 
@@ -71,7 +81,14 @@ public class Window {
 
     private final Matrix4f projectionMatrix = new Matrix4f();
     private ShaderProgram shaderProgram;
-    private int vaoId, vboId, eboId;
+    private final FloatBuffer instanceDataBuffer = BufferUtils.createFloatBuffer(MAX_INSTANCES * INSTANCE_DATA_SIZE);
+    private final QuadInstance[] quadPool = new QuadInstance[MAX_INSTANCES];
+    private final int[] indexes = new int[MAX_INSTANCES];
+    private int vaoId;
+    private int vertexVboId;
+    private int instanceVboId;
+    private int eboId;
+    private int instanceCount = 0;
 
     public void init() {
         GLFWErrorCallback.createPrint(System.err).set();
@@ -106,6 +123,11 @@ public class Window {
             glViewport(0, 0, width, height);
             projectionMatrix.setOrtho(0.0f, width, height, 0.0f, -1.0f, 1.0f);
         });
+
+        for (int i = 0; i < MAX_INSTANCES; i++) {
+            quadPool[i] = new QuadInstance();
+            indexes[i] = i;
+        }
     }
 
     public boolean shouldClose() {
@@ -117,6 +139,7 @@ public class Window {
     }
 
     public void endFrame() {
+        flushBatch();
         glfwSwapBuffers(window);
     }
 
@@ -124,19 +147,49 @@ public class Window {
         glfwPollEvents();
     }
 
-    public void drawQuad(float x, float y, float width, float height, float r, float g, float b, float a) {
-        shaderProgram.bind();
+    public void drawQuad(float x, float y, int z, float width, float height, float r, float g, float b, float a) {
+        if (instanceCount >= MAX_INSTANCES) {
+            flushBatch();
+        }
 
-        var transform = new Matrix4f()
-                .translate(x, y, 0)
-                .scale(width, height, 1);
+        var quad = quadPool[instanceCount++];
+        quad.z = z;
+        quad.transform.identity().translate(x, y, z).scale(width, height, 1);
+        quad.r = r;
+        quad.g = g;
+        quad.b = b;
+        quad.a = a;
+    }
+
+    public void flushBatch() {
+        if (instanceCount == 0) return;
+        for (int i = 0; i < instanceCount; i++) {
+            indexes[i] = i;
+        }
+        quickSort(0, instanceCount - 1);
+        IntStream.range(0, instanceCount).forEach(i -> {
+            var quad = quadPool[indexes[i]];
+            int offset = i * INSTANCE_DATA_SIZE;
+            quad.transform.get(offset, instanceDataBuffer);
+            instanceDataBuffer.put(offset + 16, quad.r);
+            instanceDataBuffer.put(offset + 17, quad.g);
+            instanceDataBuffer.put(offset + 18, quad.b);
+            instanceDataBuffer.put(offset + 19, quad.a);
+        });
+        instanceDataBuffer.position(0);
+        instanceDataBuffer.limit(instanceCount * INSTANCE_DATA_SIZE);
+
+        shaderProgram.bind();
         shaderProgram.setUniform("uProjection", projectionMatrix);
-        shaderProgram.setUniform("uTransform", transform);
-        shaderProgram.setUniform("uColor", r, g, b, a);
+        glBindBuffer(GL_ARRAY_BUFFER, instanceVboId);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, instanceDataBuffer.limit(instanceCount * INSTANCE_DATA_SIZE));
         glBindVertexArray(vaoId);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0, instanceCount);
         glBindVertexArray(0);
         shaderProgram.unbind();
+
+        instanceDataBuffer.clear();
+        instanceCount = 0;
     }
 
     public boolean isKeyPressed(int key) {
@@ -149,7 +202,8 @@ public class Window {
 
     public void cleanup() {
         glDeleteVertexArrays(vaoId);
-        glDeleteBuffers(vboId);
+        glDeleteBuffers(vertexVboId);
+        glDeleteBuffers(instanceVboId);
         glDeleteBuffers(eboId);
         shaderProgram.cleanup();
     }
@@ -171,8 +225,8 @@ public class Window {
 
         vaoId = glGenVertexArrays();
         glBindVertexArray(vaoId);
-        vboId = glGenBuffers();
-        glBindBuffer(GL_ARRAY_BUFFER, vboId);
+        vertexVboId = glGenBuffers();
+        glBindBuffer(GL_ARRAY_BUFFER, vertexVboId);
         glBufferData(GL_ARRAY_BUFFER, vertex, GL_STATIC_DRAW);
         eboId = glGenBuffers();
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, eboId);
@@ -180,9 +234,61 @@ public class Window {
         glVertexAttribPointer(0, 2, GL_FLOAT, false, 2 * Float.BYTES, 0);
         glEnableVertexAttribArray(0);
 
+        instanceVboId = glGenBuffers();
+        glBindBuffer(GL_ARRAY_BUFFER, instanceVboId);
+        int stride = 80;
+        glBufferData(GL_ARRAY_BUFFER, MAX_INSTANCES * INSTANCE_DATA_SIZE * 4, GL_DYNAMIC_DRAW);
+        for (int i = 0; i < 4; i++) {
+            glEnableVertexAttribArray(1 + i);
+            glVertexAttribPointer(1 + i, 4, GL_FLOAT, false, stride, (long) i * 16);
+            glVertexAttribDivisor(i + 1, 1);
+        }
+        glEnableVertexAttribArray(5);
+        glVertexAttribPointer(5, 4, GL_FLOAT, false, stride, 64);
+        glVertexAttribDivisor(5, 1);
+
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
 
         projectionMatrix.setOrtho(0.0f, width, height, 0.0f, -1.0f, 1.0f);
+    }
+
+    private void quickSort(int low, int high) {
+        if (low < high) {
+            int pivotIndex = partition(low, high);
+            quickSort(low, pivotIndex - 1);
+            quickSort(pivotIndex + 1, high);
+        }
+    }
+
+    private int partition(int low, int high) {
+        int pivotZ = quadPool[indexes[high]].z;
+        int i = (low - 1);
+
+        for (int j = low; j < high; j++) {
+            int currentZ = quadPool[indexes[j]].z;
+            int currentOriginalIndex = indexes[j];
+            if (currentZ > pivotZ || (currentZ == pivotZ && currentOriginalIndex < indexes[high])) {
+                i++;
+                int temp = indexes[i];
+                indexes[i] = indexes[j];
+                indexes[j] = temp;
+            }
+        }
+
+        int temp = indexes[i + 1];
+        indexes[i + 1] = indexes[high];
+        indexes[high] = temp;
+
+        return i + 1;
+    }
+
+    private static class QuadInstance {
+        final Matrix4f transform = new Matrix4f();
+        float r;
+        float g;
+        float b;
+        float a;
+        int z;
     }
 }

@@ -1,15 +1,15 @@
 #version 460 core
 
 layout (location = 0) in vec2 aPos;
+layout (location = 1) in mat4 aTransform;
+layout (location = 5) in vec4 aColor;
 
 uniform mat4 uProjection;
-uniform mat4 uTransform;
-uniform vec4 uColor;
 
 out vec4 fColor;
 
 void main()
 {
-    gl_Position = uProjection * uTransform * vec4(aPos, 0.0, 1.0);
-    fColor = uColor;
+    gl_Position = uProjection * aTransform * vec4(aPos, 0.0, 1.0);
+    fColor = aColor;
 }

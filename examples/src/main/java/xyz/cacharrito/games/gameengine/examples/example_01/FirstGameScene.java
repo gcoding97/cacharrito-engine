@@ -39,7 +39,7 @@ public class FirstGameScene implements Scene {
         world.addComponent(player, new KeepOnScreen());
         world.addComponent(player, new AffectedByDefaultKinematicSystem());
         world.addComponent(player, Transform2D.DEFAULT);
-        world.addComponent(player, new RectangleSprite(new RectangleCollisionShape(250, 250), 0, 1, 0, 1));
+        world.addComponent(player, new RectangleSprite(new RectangleCollisionShape(250, 250), 0, 0, 1, 0, 1));
         world.addComponent(player, new Velocity2D(new Vector2(0, 0)));
         world.addComponent(player, new Collider2D(new RectangleCollisionShape(250, 250), Vector2.ZERO, false, 1, 2));
         world.addComponent(player, new InputSettings(List.of(
@@ -53,7 +53,7 @@ public class FirstGameScene implements Scene {
 
         int obstacle = world.createEntity();
         world.addComponent(obstacle, new Transform2D(new Vector2(window.getWidth() / 2f - 25, window.getHeight() / 2f - 25), 0, Vector2.ONE));
-        world.addComponent(obstacle, new RectangleSprite(new RectangleCollisionShape(50, 50), 1, 0, 1, 1));
+        world.addComponent(obstacle, new RectangleSprite(new RectangleCollisionShape(50, 50), 0, 1, 0, 1, 1));
 
         world.addComponent(obstacle, new Collider2D(new RectangleCollisionShape(50, 50), Vector2.ZERO, false, 2, 0));
         entities[1] = obstacle;
@@ -79,7 +79,8 @@ public class FirstGameScene implements Scene {
     public record KeepOnScreen() implements Component {
     }
 
-    public record RectangleSprite(CollisionShape rect, float r, float g, float b, float a) implements Component {
+    public record RectangleSprite(CollisionShape rect, int renderZIndex, float r, float g, float b,
+                                  float a) implements Component {
     }
 
     @RenderSystem
@@ -96,7 +97,7 @@ public class FirstGameScene implements Scene {
         public void update(int entity, float delta) {
             var transform2D = getWorld().getComponent(entity, Transform2D.class);
             var sprite = getWorld().getComponent(entity, RectangleSprite.class);
-            window.drawQuad(transform2D.position().x(), transform2D.position().y(), sprite.rect().getArea().x(), sprite.rect().getArea().y(), sprite.r(), sprite.g(), sprite.b(), sprite.a());
+            window.drawQuad(transform2D.position().x(), transform2D.position().y(), sprite.renderZIndex(), sprite.rect().getArea().x(), sprite.rect().getArea().y(), sprite.r(), sprite.g(), sprite.b(), sprite.a());
         }
     }
 
