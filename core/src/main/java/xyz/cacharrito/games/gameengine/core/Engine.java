@@ -2,8 +2,8 @@ package xyz.cacharrito.games.gameengine.core;
 
 import lombok.Getter;
 import xyz.cacharrito.games.gameengine.core.ecs.World;
-import xyz.cacharrito.games.gameengine.core.middleware.Window;
-import xyz.cacharrito.games.gameengine.core.middleware.properties.WindowProperties;
+import xyz.cacharrito.games.gameengine.core.graphics.Window;
+import xyz.cacharrito.games.gameengine.core.graphics.properties.WindowProperties;
 import xyz.cacharrito.games.gameengine.core.scene.Scene;
 import xyz.cacharrito.games.gameengine.core.system.CollisionSystem2D;
 import xyz.cacharrito.games.gameengine.core.system.InputSystem;
@@ -63,6 +63,7 @@ public class Engine {
             window.endFrame();
         }
         currentScene.dispose();
+        window.cleanup();
     }
 
 }

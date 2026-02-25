@@ -11,6 +11,11 @@
 
     <packaging>jar</packaging>
     <dependencies>
+
+        <dependency>
+            <groupId>xyz.cacharrito.games</groupId>
+            <artifactId>shaders</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.lwjgl</groupId>
             <artifactId>lwjgl-glfw</artifactId>
@@ -37,6 +42,10 @@
         <dependency>
             <groupId>org.lwjgl</groupId>
             <artifactId>lwjgl-opengl</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.joml</groupId>
+            <artifactId>joml</artifactId>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>

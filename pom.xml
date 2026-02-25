@@ -11,6 +11,7 @@
     <modules>
         <module>core</module>
         <module>examples</module>
+        <module>shaders</module>
     </modules>
 
     <properties>
@@ -26,6 +27,11 @@
             <dependency>
                 <groupId>xyz.cacharrito.games</groupId>
                 <artifactId>core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>xyz.cacharrito.games</groupId>
+                <artifactId>shaders</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -60,6 +66,11 @@
                 <artifactId>lwjgl-opengl</artifactId>
                 <version>${lwjgl.version}</version>
                 <classifier>${os.classifier}</classifier>
+            </dependency>
+            <dependency>
+                <groupId>org.joml</groupId>
+                <artifactId>joml</artifactId>
+                <version>1.10.5</version>
             </dependency>
             <dependency>
                 <groupId>org.projectlombok</groupId>

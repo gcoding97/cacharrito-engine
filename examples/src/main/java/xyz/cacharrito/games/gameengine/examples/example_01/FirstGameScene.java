@@ -16,8 +16,8 @@ import xyz.cacharrito.games.gameengine.core.ecs.GameSystem;
 import xyz.cacharrito.games.gameengine.core.ecs.RenderSystem;
 import xyz.cacharrito.games.gameengine.core.ecs.RequireComponents;
 import xyz.cacharrito.games.gameengine.core.ecs.World;
+import xyz.cacharrito.games.gameengine.core.graphics.Window;
 import xyz.cacharrito.games.gameengine.core.math.Vector2;
-import xyz.cacharrito.games.gameengine.core.middleware.Window;
 import xyz.cacharrito.games.gameengine.core.scene.Scene;
 
 import java.util.List;
