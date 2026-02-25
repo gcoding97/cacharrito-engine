@@ -1,7 +1,7 @@
 package xyz.cacharrito.games.gameengine.core.scene;
 
 import xyz.cacharrito.games.gameengine.core.ecs.World;
-import xyz.cacharrito.games.gameengine.core.middleware.Window;
+import xyz.cacharrito.games.gameengine.core.graphics.Window;
 
 public interface Scene {
     void init(World world, Window window);

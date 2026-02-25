@@ -1,11 +1,17 @@
-package xyz.cacharrito.games.gameengine.core.middleware;
+package xyz.cacharrito.games.gameengine.core.graphics;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.joml.Matrix4f;
 import org.lwjgl.glfw.GLFWErrorCallback;
-import xyz.cacharrito.games.gameengine.core.middleware.properties.WindowProperties;
+import xyz.cacharrito.games.gameengine.core.graphics.properties.WindowProperties;
 
+import static org.lwjgl.glfw.GLFW.GLFW_CONTEXT_VERSION_MAJOR;
+import static org.lwjgl.glfw.GLFW.GLFW_CONTEXT_VERSION_MINOR;
 import static org.lwjgl.glfw.GLFW.GLFW_FALSE;
+import static org.lwjgl.glfw.GLFW.GLFW_OPENGL_CORE_PROFILE;
+import static org.lwjgl.glfw.GLFW.GLFW_OPENGL_FORWARD_COMPAT;
+import static org.lwjgl.glfw.GLFW.GLFW_OPENGL_PROFILE;
 import static org.lwjgl.glfw.GLFW.GLFW_PLATFORM;
 import static org.lwjgl.glfw.GLFW.GLFW_PLATFORM_X11;
 import static org.lwjgl.glfw.GLFW.GLFW_PRESS;
@@ -29,19 +35,25 @@ import static org.lwjgl.glfw.GLFW.glfwWindowHint;
 import static org.lwjgl.glfw.GLFW.glfwWindowShouldClose;
 import static org.lwjgl.opengl.GL.createCapabilities;
 import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
-import static org.lwjgl.opengl.GL11.GL_MODELVIEW;
-import static org.lwjgl.opengl.GL11.GL_PROJECTION;
-import static org.lwjgl.opengl.GL11.GL_QUADS;
-import static org.lwjgl.opengl.GL11.glBegin;
+import static org.lwjgl.opengl.GL11.GL_FLOAT;
+import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
+import static org.lwjgl.opengl.GL11.GL_UNSIGNED_INT;
 import static org.lwjgl.opengl.GL11.glClear;
 import static org.lwjgl.opengl.GL11.glClearColor;
-import static org.lwjgl.opengl.GL11.glColor4f;
-import static org.lwjgl.opengl.GL11.glEnd;
-import static org.lwjgl.opengl.GL11.glLoadIdentity;
-import static org.lwjgl.opengl.GL11.glMatrixMode;
-import static org.lwjgl.opengl.GL11.glOrtho;
-import static org.lwjgl.opengl.GL11.glVertex2f;
+import static org.lwjgl.opengl.GL11.glDrawElements;
 import static org.lwjgl.opengl.GL11.glViewport;
+import static org.lwjgl.opengl.GL15.GL_ARRAY_BUFFER;
+import static org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER;
+import static org.lwjgl.opengl.GL15.GL_STATIC_DRAW;
+import static org.lwjgl.opengl.GL15.glBindBuffer;
+import static org.lwjgl.opengl.GL15.glBufferData;
+import static org.lwjgl.opengl.GL15.glDeleteBuffers;
+import static org.lwjgl.opengl.GL15.glGenBuffers;
+import static org.lwjgl.opengl.GL20.glEnableVertexAttribArray;
+import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
+import static org.lwjgl.opengl.GL30.glBindVertexArray;
+import static org.lwjgl.opengl.GL30.glDeleteVertexArrays;
+import static org.lwjgl.opengl.GL30.glGenVertexArrays;
 
 @RequiredArgsConstructor
 public class Window {
@@ -57,6 +69,10 @@ public class Window {
     @Getter
     private int height;
 
+    private final Matrix4f projectionMatrix = new Matrix4f();
+    private ShaderProgram shaderProgram;
+    private int vaoId, vboId, eboId;
+
     public void init() {
         GLFWErrorCallback.createPrint(System.err).set();
         glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11); // TODO: Choose platform dynamically
@@ -66,6 +82,10 @@ public class Window {
         glfwDefaultWindowHints(); // optional, the current window hints are already the default
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE); // the window will stay hidden after creation
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE); // the window will be resizable
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
         window = glfwCreateWindow(props.width(), props.height(), props.title(), 0, 0);
         width = props.width();
         height = props.height();
@@ -75,10 +95,7 @@ public class Window {
         glfwMakeContextCurrent(window);
         glfwSwapInterval(props.vSyncInterval());
         createCapabilities();
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glOrtho(0, props.width(), props.height(), 0, -1, 1);
-        glMatrixMode(GL_MODELVIEW);
+        createVao();
         glClearColor(0.2f, 0.3f, 0.8f, 1.0f);
         glfwSwapBuffers(window);
         glfwShowWindow(window);
@@ -87,10 +104,7 @@ public class Window {
             this.width = width;
             this.height = height;
             glViewport(0, 0, width, height);
-            glMatrixMode(GL_PROJECTION);
-            glLoadIdentity();
-            glOrtho(0, width, height, 0, -1, 1);
-            glMatrixMode(GL_MODELVIEW);
+            projectionMatrix.setOrtho(0.0f, width, height, 0.0f, -1.0f, 1.0f);
         });
     }
 
@@ -111,13 +125,18 @@ public class Window {
     }
 
     public void drawQuad(float x, float y, float width, float height, float r, float g, float b, float a) {
-        glColor4f(r, g, b, a);
-        glBegin(GL_QUADS);
-        glVertex2f(x, y);                   // Top Left
-        glVertex2f(x + width, y);           // Top Right
-        glVertex2f(x + width, y + height);  // Bottom Right
-        glVertex2f(x, y + height);          // Bottom Left
-        glEnd();
+        shaderProgram.bind();
+
+        var transform = new Matrix4f()
+                .translate(x, y, 0)
+                .scale(width, height, 1);
+        shaderProgram.setUniform("uProjection", projectionMatrix);
+        shaderProgram.setUniform("uTransform", transform);
+        shaderProgram.setUniform("uColor", r, g, b, a);
+        glBindVertexArray(vaoId);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+        shaderProgram.unbind();
     }
 
     public boolean isKeyPressed(int key) {
@@ -128,4 +147,42 @@ public class Window {
         return glfwGetMouseButton(window, button) == GLFW_PRESS;
     }
 
+    public void cleanup() {
+        glDeleteVertexArrays(vaoId);
+        glDeleteBuffers(vboId);
+        glDeleteBuffers(eboId);
+        shaderProgram.cleanup();
+    }
+
+    private void createVao() {
+        shaderProgram = new ShaderProgram("default.vert", "default.frag");
+
+        var vertex = new float[]{
+                0, 0,
+                0, 1,
+                1, 1,
+                1, 0,
+        };
+
+        var index = new int[]{
+                0, 1, 2,
+                2, 3, 0
+        };
+
+        vaoId = glGenVertexArrays();
+        glBindVertexArray(vaoId);
+        vboId = glGenBuffers();
+        glBindBuffer(GL_ARRAY_BUFFER, vboId);
+        glBufferData(GL_ARRAY_BUFFER, vertex, GL_STATIC_DRAW);
+        eboId = glGenBuffers();
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, eboId);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, index, GL_STATIC_DRAW);
+        glVertexAttribPointer(0, 2, GL_FLOAT, false, 2 * Float.BYTES, 0);
+        glEnableVertexAttribArray(0);
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+
+        projectionMatrix.setOrtho(0.0f, width, height, 0.0f, -1.0f, 1.0f);
+    }
 }
